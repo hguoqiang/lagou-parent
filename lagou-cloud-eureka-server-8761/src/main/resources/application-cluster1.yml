@@ -1,0 +1,19 @@
+server:
+  port: 8761 #Eureka server服务端⼝
+
+spring:
+  application:
+    name: lagou-cloud-eureka-server # 应⽤名称，会在Eureka中作为服务的id标识（serviceId）
+
+#eureka客户端配置（和server交互），Eureka 客户端也是一个Client
+eureka:
+  client:
+    service-url: # 客户端与EurekaServer交互的地址,eureka集群中的每一个Server 相对于其它的Server来讲都是一个Client
+      #集群模式下，defaultZone指向的是其它Eureka Server的地址
+      defaultZone: http://LagouCloudEurekaServerB:8762/eureka
+    register-with-eureka: true #集群模式下是true
+    fetch-registry: true
+
+
+  instance:
+    appname: LagouCloudEurekaServerA #当前eureka实例的主机名

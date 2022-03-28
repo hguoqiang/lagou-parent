@@ -1,5 +1,7 @@
 package com.lagou.edu.controller;
 
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
@@ -81,4 +83,46 @@ public class AutodeliverController {
                 userId + "的默认简历当前状态为： " + forObject);
         return forObject;
     }
+
+
+    @GetMapping("/checkState3/{userId}")
+    public Integer findResumeOpenState3(@PathVariable Long userId) {
+
+        //通过 Ribbon负载均衡器 去访问服务提供者,把 ip地址和端口号 替换为 服务名
+        String url = "http://" + "lagou-service-resume" + "/resume/openstate/" + userId;
+
+        Integer forObject =
+                restTemplate.getForObject(url, Integer.class);
+        System.out.println("======>>>通过Ribbon负载均衡器，调⽤简历微服务，获取到⽤户,响应：" + forObject);
+        return forObject;
+    }
+
+    /**
+     * Hystrix熔断,返回默认值，服务降级
+     * @param userId
+     * @return
+     */
+    @GetMapping("/checkState4/{userId}")
+    @HystrixCommand(commandProperties = {
+            @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "2000"),
+    },fallbackMethod = "findResumeOpenState4fallback")
+    public Integer findResumeOpenState4(@PathVariable Long userId) {
+
+        //通过 Ribbon负载均衡器 去访问服务提供者,把 ip地址和端口号 替换为 服务名
+        String url = "http://" + "lagou-service-resume" + "/resume/openstate/" + userId;
+
+        Integer forObject =
+                restTemplate.getForObject(url, Integer.class);
+        System.out.println("======>>>通过Ribbon负载均衡器+Hystrix熔断器，调⽤简历微服务，获取到⽤户,响应：" + forObject);
+        return forObject;
+    }
+
+    /**
+     * 定义回退方法，返回默认值，兜底数据
+     * 注意，该方法的形参和返回值要与原方法保持一致
+     */
+    public Integer findResumeOpenState4fallback(Long userId) {
+        return -1;
+    }
+
 }

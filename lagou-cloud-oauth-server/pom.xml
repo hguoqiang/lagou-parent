@@ -9,20 +9,14 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>lagou-service-autodeliver</artifactId>
-
+    <artifactId>lagou-cloud-oauth-server</artifactId>
 
     <dependencies>
+        <!--导⼊Eureka Client依赖-->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
         </dependency>
-
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
-        </dependency>
-
         <!--导⼊spring cloud oauth2依赖-->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
@@ -45,6 +39,6 @@
             <artifactId>spring-security-oauth2</artifactId>
             <version>2.3.4.RELEASE</version>
         </dependency>
-
     </dependencies>
+
 </project>

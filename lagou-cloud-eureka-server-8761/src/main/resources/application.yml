@@ -1,3 +1,3 @@
 spring:
   profiles:
-    active: cluster1
+    active: cluster2

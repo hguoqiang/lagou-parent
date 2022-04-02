@@ -5,15 +5,20 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.jwt.crypto.sign.MacSigner;
 import org.springframework.security.oauth2.config.annotation.configurers.ClientDetailsServiceConfigurer;
 import org.springframework.security.oauth2.config.annotation.web.configuration.AuthorizationServerConfigurerAdapter;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableAuthorizationServer;
 import org.springframework.security.oauth2.config.annotation.web.configurers.AuthorizationServerEndpointsConfigurer;
 import org.springframework.security.oauth2.config.annotation.web.configurers.AuthorizationServerSecurityConfigurer;
+import org.springframework.security.oauth2.provider.client.JdbcClientDetailsService;
 import org.springframework.security.oauth2.provider.token.AuthorizationServerTokenServices;
 import org.springframework.security.oauth2.provider.token.DefaultTokenServices;
 import org.springframework.security.oauth2.provider.token.TokenStore;
-import org.springframework.security.oauth2.provider.token.store.InMemoryTokenStore;
+import org.springframework.security.oauth2.provider.token.store.JwtAccessTokenConverter;
+import org.springframework.security.oauth2.provider.token.store.JwtTokenStore;
+
+import javax.sql.DataSource;
 
 /**
  * @description: 当前类为Oauth2 server的配置类（需要继承特定的⽗类AuthorizationServerConfigurerAdapter）
@@ -23,9 +28,21 @@ import org.springframework.security.oauth2.provider.token.store.InMemoryTokenSto
 @Configuration
 @EnableAuthorizationServer//开启认证服务器功能
 public class OauthServerConfig extends AuthorizationServerConfigurerAdapter {
+
+    //jwt 签名密钥
+    //@Value("${jwt.signing.key}")
+    private String jwtSigningKey = "hsjkewj0980a787d";
+
+
     @Autowired
     private AuthenticationManager authenticationManager;
 
+    @Autowired
+    private DataSource dataSource;
+
+
+    @Autowired
+    private LagouAccessTokenConvertor lagouAccessTokenConvertor;
 
 
     /**
@@ -60,8 +77,8 @@ public class OauthServerConfig extends AuthorizationServerConfigurerAdapter {
      */
     @Override
     public void configure(ClientDetailsServiceConfigurer clients) throws Exception {
-        super.configure(clients);
-        clients.inMemory()//客户端信息存储在什么地方，可以是内存、数据库等
+        //从内存中加载Oauth2客户端
+        /*clients.inMemory()//客户端信息存储在什么地方，可以是内存、数据库等
                 .withClient("client_test")//添加一个client配置，指定client_id
                 .secret("test123")//指定客户端的密码
                 .resourceIds("autodeliver")//指定客户端所能访问的资源id清单，此处的资源id也需要在资源服务器配置一样的
@@ -69,9 +86,16 @@ public class OauthServerConfig extends AuthorizationServerConfigurerAdapter {
                 .authorizedGrantTypes("password", "refresh_token")
                 // 客户端的权限范围，此处配置为all全部即可
                 .scopes("all")
-        ;
+        ;*/
 
+        //从数据库加载Oauth2客户端信息
+        clients.withClientDetails(clientDetailsService());
 
+    }
+
+    @Bean
+    public JdbcClientDetailsService clientDetailsService() {
+        return new JdbcClientDetailsService(dataSource);
     }
 
     /**
@@ -83,7 +107,6 @@ public class OauthServerConfig extends AuthorizationServerConfigurerAdapter {
      */
     @Override
     public void configure(AuthorizationServerEndpointsConfigurer endpoints) throws Exception {
-        super.configure(endpoints);
         endpoints.tokenStore(tokenStore())//指定token的存储方式
                 .tokenServices(authorizationServerTokenServices())//token服务的一个描述，可以认为是token生成细节的描述，比如有效时间是多少等
                 .authenticationManager(authenticationManager)//指定认证管理器，随后注入一个当前类使用即可
@@ -98,9 +121,43 @@ public class OauthServerConfig extends AuthorizationServerConfigurerAdapter {
      */
     @Bean
     public TokenStore tokenStore() {
-        return new InMemoryTokenStore();
+        //return new InMemoryTokenStore();
+
+        /*
+        使用JWT格式token,JSON Web Token（JWT）是⼀个开放的⾏业标准（RFC 7519）,
+        JWT可以使⽤HMAC算法或使⽤RSA的公钥/私钥对来签名，防⽌被篡改。
+        JWT令牌由三部分组成:JWT令牌由三部分组成：Header、Payload、Signature。
+        第三部分是签名，此部分⽤于防⽌jwt内容被篡改。 这个部分使⽤base64url将
+        前两部分进⾏编码，编码后使⽤点（.）连接组成字符串，最后使⽤header中声
+        明签名算法进⾏签名。
+        HMACSHA256(
+            base64UrlEncode(header) + "." +
+            base64UrlEncode(payload),
+            secret)
+            base64UrlEncode(header)： jwt令牌的第⼀部分。
+            base64UrlEncode(payload)： jwt令牌的第⼆部分。
+            secret：签名所使⽤的密钥
+         */
+
+        return new JwtTokenStore(jwtAccessTokenConverter());
     }
 
+    /**
+     * 返回jwt令牌转换器（帮助我们⽣成jwt令牌的）。
+     * jwt加密签名 我们使用非对称密钥，在这⾥，我们可以把签名密钥传递进去给转换器对象
+     *
+     * @return
+     */
+    @Bean
+    public JwtAccessTokenConverter jwtAccessTokenConverter() {
+        JwtAccessTokenConverter jwtAccessTokenConverter = new JwtAccessTokenConverter();
+        jwtAccessTokenConverter.setSigningKey(jwtSigningKey);// 签名密钥
+        jwtAccessTokenConverter.setVerifier(new MacSigner(jwtSigningKey));// 验证时使⽤的密钥，和签名密钥保持⼀致
+
+        jwtAccessTokenConverter.setAccessTokenConverter(lagouAccessTokenConvertor);
+
+        return jwtAccessTokenConverter;
+    }
 
     @Bean
     public AuthorizationServerTokenServices authorizationServerTokenServices() {
@@ -109,6 +166,9 @@ public class OauthServerConfig extends AuthorizationServerConfigurerAdapter {
         defaultTokenServices.setSupportRefreshToken(true);//设置支持刷新令牌
         defaultTokenServices.setAccessTokenValiditySeconds(20);//设置令牌有效时间（⼀般设置为2个⼩时），access_token 是我们请求资源需要携带的令牌
         defaultTokenServices.setRefreshTokenValiditySeconds(24 * 3600);// 设置刷新令牌的有效时间，可以设置长一些，一天、两天
+
+        //针对 jwt令牌的添加
+        defaultTokenServices.setTokenEnhancer(jwtAccessTokenConverter());
         return defaultTokenServices;
     }
 }
